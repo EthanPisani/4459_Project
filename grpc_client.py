@@ -1,13 +1,14 @@
 import grpc
 import chat_pb2
 import chat_pb2_grpc
+import proxy_pb2_grpc
 import threading
 
 class ChatClient:
     def __init__(self, name):
         self.name = name
-        self.channel = grpc.insecure_channel('localhost:50051')
-        self.stub = chat_pb2_grpc.ChatServiceStub(self.channel)
+        self.channel = grpc.insecure_channel('localhost:50052') # TODO don't hardcode proxy address
+        self.stub = proxy_pb2_grpc.ProxyServiceStub(self.channel)
 
     def join_chat(self):
         response = self.stub.Join(chat_pb2.JoinRequest(name=self.name))
