@@ -3,64 +3,84 @@ from concurrent import futures
 import time
 import threading
 from queue import Queue
-
+import heartbeat_pb2
+import heartbeat_pb2_grpc
 import chat_pb2
 import chat_pb2_grpc
 
+class ChatServer(chat_pb2_grpc.ChatServiceServicer):
+    def __init__(self, server_id="primary"):
+        self.messages = []  # list of messages
+        self.clients = []  # list of connected client's queues
+        self.lock = threading.Lock()  # lock to sync access to shared state
+        self.server_id = server_id
+        self._setup_heartbeat_client()
+        self._start_heartbeat_thread()
 
-class ChatServer:
-    def __init__(self):
-        self.messages = [] #list of messages
-        self.clients= [] #list of connected client's queues
-        self.lock = threading.Lock() #lock to sync access to shared state
+    def _setup_heartbeat_client(self):
+        self.heartbeat_channel = grpc.insecure_channel('localhost:50053')
+        self.heartbeat_stub = heartbeat_pb2_grpc.HeartbeatStub(self.heartbeat_channel)
+
+    def _start_heartbeat_thread(self):
+        def send_heartbeats():
+            while True:
+                try:
+                    response = self.heartbeat_stub.SendHeartbeat(heartbeat_pb2.HeartbeatRequest(server_id=self.server_id))
+                    print(f"Heartbeat sent by {self.server_id}, received: {response.received}")
+                except grpc.RpcError as e:
+                    print(f"Heartbeat failed: {e}")
+                time.sleep(2)  # Send heartbeat every 2 seconds
+
+        heartbeat_thread = threading.Thread(target=send_heartbeats, daemon=True)
+        heartbeat_thread.start()
 
     def Join(self, request, context):
-        name = request.name #get client name/username
-        with self.lock: #all self.locks are just ensure thread security
-            self.clients.append(name) #add new client's name to client list
-
+        name = request.name
+        with self.lock:
+            self.clients.append(name)
         return chat_pb2.JoinResponse(welcome_message=f"Welcome, {name}!")
 
-    #Function to broadcast message to all connected clients
     def SendMessage(self, request, context):
         with self.lock:
-            self.messages.append(request) #add to message history list
+            self.messages.append(request)
             for client in self.clients:
                 if isinstance(client, Queue):
-                    client.put(request) #push the message to all current client's queues
-
+                    print("Sending message to client", client)
+                    client.put(request)
         return chat_pb2.Empty()
 
     def ReceiveMessages(self, request, context):
-        q = Queue() #add a new queue for new client to get messages
+        q = Queue()
         with self.lock:
             for message in self.messages:
-                yield message #use yield to send message one by one, while keeping function going
+                yield message
             self.clients.append(q)
 
         try:
-            while True: #while True so always checking for new messages
+            while True:
                 message = q.get()
                 yield message
         except Exception as e:
             print("There was an error:", e)
         finally:
-            with self.lock: #when server closes or there's an error remove client
+            with self.lock:
                 if q in self.clients:
                     self.clients.remove(q)
 
-def serve():
+def serve(server_id="primary"):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatServer(), server)
+    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatServer(server_id), server)
     server.add_insecure_port('[::]:50051')
     server.start()
-    print("Chat server started on port 50051.")
+    print(f"Chat server {server_id} started on port 50051.")
     try:
         while True:
-            time.sleep(86400)  # Run forever (or until interrupted)
+            time.sleep(86400)
     except KeyboardInterrupt:
         print("Stopping server...")
         server.stop(0)
 
 if __name__ == '__main__':
-    serve()
+    import sys
+    server_id = "primary" if len(sys.argv) <= 1 else sys.argv[1]
+    serve(server_id)
