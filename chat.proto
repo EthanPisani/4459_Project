@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package chat;
+
+service ChatService {
+    // Client joins the chatroom
+    rpc Join(JoinRequest) returns (JoinResponse);
+
+    // Client sends a message to the server
+    rpc SendMessage(Message) returns (Empty);
+
+    // Client receives chat messages as a stream
+    rpc ReceiveMessages(Empty) returns (stream Message);
+}
+
+message JoinRequest {
+    string name = 1;
+}
+
+message JoinResponse {
+    string welcome_message = 1;
+}
+
+message Message {
+    string sender = 1;
+    string content = 2;
+}
+
+message Empty {}

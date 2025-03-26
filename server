@@ -1,0 +1,66 @@
+import grpc
+from concurrent import futures
+import time
+import threading
+from queue import Queue
+
+import chat_pb2
+import chat_pb2_grpc
+
+
+class ChatServer:
+    def __init__(self):
+        self.messages = [] #list of messages
+        self.clients= [] #list of connected client's queues
+        self.lock = threading.Lock() #lock to sync access to shared state
+
+    def Join(self, request, context):
+        name = request.name #get client name/username
+        with self.lock: #all self.locks are just ensure thread security
+            self.clients.append(name) #add new client's name to client list
+
+        return chat_pb2.JoinResponse(welcome_message=f"Welcome, {name}!")
+
+    #Function to broadcast message to all connected clients
+    def SendMessage(self, request, context):
+        with self.lock:
+            self.messages.append(request) #add to message history list
+            for client in self.clients:
+                if isinstance(client, Queue):
+                    client.put(request) #push the message to all current client's queues
+
+        return chat_pb2.Empty()
+
+    def ReceiveMessages(self, request, context):
+        q = Queue() #add a new queue for new client to get messages
+        with self.lock:
+            for message in self.messages:
+                yield message #use yield to send message one by one, while keeping function going
+            self.clients.append(q)
+
+        try:
+            while True: #while True so always checking for new messages
+                message = q.get()
+                yield message
+        except Exception as e:
+            print("There was an error:", e)
+        finally:
+            with self.lock: #when server closes or there's an error remove client
+                if q in self.clients:
+                    self.clients.remove(q)
+
+def serve():
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatServer(), server)
+    server.add_insecure_port('[::]:50051')
+    server.start()
+    print("Chat server started on port 50051.")
+    try:
+        while True:
+            time.sleep(86400)  # Run forever (or until interrupted)
+    except KeyboardInterrupt:
+        print("Stopping server...")
+        server.stop(0)
+
+if __name__ == '__main__':
+    serve()

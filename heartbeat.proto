@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+service Heartbeat {
+  rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc SwitchServer(SwitchRequest) returns (SwitchResponse);
+}
+
+message HeartbeatRequest {
+  string server_id = 1;
+}
+
+message HeartbeatResponse {
+  bool received = 1;
+}
+
+message SwitchRequest {
+  string new_primary = 1;
+}
+
+message SwitchResponse {
+  bool success = 1;
+}
