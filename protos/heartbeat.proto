@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package chat;
+
 service Heartbeat {
   rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc SwitchServer(SwitchRequest) returns (SwitchResponse);
@@ -7,6 +9,7 @@ service Heartbeat {
 
 message HeartbeatRequest {
   string server_id = 1;
+  uint32 server_port = 2;
 }
 
 message HeartbeatResponse {
@@ -15,6 +18,7 @@ message HeartbeatResponse {
 
 message SwitchRequest {
   string new_primary = 1;
+  uint32 server_port = 2;
 }
 
 message SwitchResponse {

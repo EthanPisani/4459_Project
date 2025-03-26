@@ -9,11 +9,12 @@ import chat_pb2
 import chat_pb2_grpc
 
 class ChatServer(chat_pb2_grpc.ChatServiceServicer):
-    def __init__(self, server_id="primary"):
+    def __init__(self, server_id="primary", server_port=50051):
         self.messages = []  # list of messages
         self.clients = []  # list of connected client's queues
         self.lock = threading.Lock()  # lock to sync access to shared state
         self.server_id = server_id
+        self.server_port=server_port
         self._setup_heartbeat_client()
         self._start_heartbeat_thread()
 
@@ -25,7 +26,7 @@ class ChatServer(chat_pb2_grpc.ChatServiceServicer):
         def send_heartbeats():
             while True:
                 try:
-                    response = self.heartbeat_stub.SendHeartbeat(heartbeat_pb2.HeartbeatRequest(server_id=self.server_id))
+                    response = self.heartbeat_stub.SendHeartbeat(heartbeat_pb2.HeartbeatRequest(server_id=self.server_id, server_port=self.server_port))
                     print(f"Heartbeat sent by {self.server_id}, received: {response.received}")
                 except grpc.RpcError as e:
                     print(f"Heartbeat failed: {e}")
@@ -67,12 +68,12 @@ class ChatServer(chat_pb2_grpc.ChatServiceServicer):
                 if q in self.clients:
                     self.clients.remove(q)
 
-def serve(server_id="primary"):
+def serve(server_id="primary", server_port=50051):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatServer(server_id), server)
-    server.add_insecure_port('[::]:50051')
+    chat_pb2_grpc.add_ChatServiceServicer_to_server(ChatServer(server_id, server_port), server)
+    server.add_insecure_port(f'[::]:{server_port}')
     server.start()
-    print(f"Chat server {server_id} started on port 50051.")
+    print(f"Chat server {server_id} started on port {server_port}.")
     try:
         while True:
             time.sleep(86400)
@@ -83,4 +84,6 @@ def serve(server_id="primary"):
 if __name__ == '__main__':
     import sys
     server_id = "primary" if len(sys.argv) <= 1 else sys.argv[1]
-    serve(server_id)
+    server_port = 50051 if len(sys.argv) <= 2 else int(sys.argv[2])
+
+    serve(server_id, server_port)

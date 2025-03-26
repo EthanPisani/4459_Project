@@ -24,21 +24,21 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fheartbeat.proto\"%\n\x10HeartbeatRequest\x12\x11\n\tserver_id\x18\x01 \x01(\t\"%\n\x11HeartbeatResponse\x12\x10\n\x08received\x18\x01 \x01(\x08\"$\n\rSwitchRequest\x12\x13\n\x0bnew_primary\x18\x01 \x01(\t\"!\n\x0eSwitchResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x32t\n\tHeartbeat\x12\x36\n\rSendHeartbeat\x12\x11.HeartbeatRequest\x1a\x12.HeartbeatResponse\x12/\n\x0cSwitchServer\x12\x0e.SwitchRequest\x1a\x0f.SwitchResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0fheartbeat.proto\x12\x04\x63hat\":\n\x10HeartbeatRequest\x12\x11\n\tserver_id\x18\x01 \x01(\t\x12\x13\n\x0bserver_port\x18\x02 \x01(\r\"%\n\x11HeartbeatResponse\x12\x10\n\x08received\x18\x01 \x01(\x08\"9\n\rSwitchRequest\x12\x13\n\x0bnew_primary\x18\x01 \x01(\t\x12\x13\n\x0bserver_port\x18\x02 \x01(\r\"!\n\x0eSwitchResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x32\x88\x01\n\tHeartbeat\x12@\n\rSendHeartbeat\x12\x16.chat.HeartbeatRequest\x1a\x17.chat.HeartbeatResponse\x12\x39\n\x0cSwitchServer\x12\x13.chat.SwitchRequest\x1a\x14.chat.SwitchResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'heartbeat_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_HEARTBEATREQUEST']._serialized_start=19
-  _globals['_HEARTBEATREQUEST']._serialized_end=56
-  _globals['_HEARTBEATRESPONSE']._serialized_start=58
-  _globals['_HEARTBEATRESPONSE']._serialized_end=95
-  _globals['_SWITCHREQUEST']._serialized_start=97
-  _globals['_SWITCHREQUEST']._serialized_end=133
-  _globals['_SWITCHRESPONSE']._serialized_start=135
-  _globals['_SWITCHRESPONSE']._serialized_end=168
-  _globals['_HEARTBEAT']._serialized_start=170
-  _globals['_HEARTBEAT']._serialized_end=286
+  _globals['_HEARTBEATREQUEST']._serialized_start=25
+  _globals['_HEARTBEATREQUEST']._serialized_end=83
+  _globals['_HEARTBEATRESPONSE']._serialized_start=85
+  _globals['_HEARTBEATRESPONSE']._serialized_end=122
+  _globals['_SWITCHREQUEST']._serialized_start=124
+  _globals['_SWITCHREQUEST']._serialized_end=181
+  _globals['_SWITCHRESPONSE']._serialized_start=183
+  _globals['_SWITCHRESPONSE']._serialized_end=216
+  _globals['_HEARTBEAT']._serialized_start=219
+  _globals['_HEARTBEAT']._serialized_end=355
 # @@protoc_insertion_point(module_scope)
