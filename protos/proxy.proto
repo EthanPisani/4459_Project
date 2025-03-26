@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package chat;
 
+import "chat.proto";
+import "heartbeat.proto";
+
 service ProxyService {
   // Client joins the chatroom
   rpc Join(JoinRequest) returns (JoinResponse);
@@ -11,15 +14,7 @@ service ProxyService {
 
   // Client receives chat messages as a stream
   rpc ReceiveMessages(Empty) returns (stream Message);
+
+  // Proxy receives switch server request from the heartbeat service
+  rpc SwitchServer(SwitchRequest) returns (SwitchResponse);
 }
-
-message JoinRequest { string name = 1; }
-
-message JoinResponse { string welcome_message = 1; }
-
-message Message {
-  string sender = 1;
-  string content = 2;
-}
-
-message Empty {}

@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package chat;
+
 service Heartbeat {
   rpc SendHeartbeat(HeartbeatRequest) returns (HeartbeatResponse);
   rpc SwitchServer(SwitchRequest) returns (SwitchResponse);
