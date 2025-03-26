@@ -19,14 +19,15 @@ class ChatServer:
         with self.lock: #all self.locks are just ensure thread security
             self.clients.append(name) #add new client's name to client list
 
-        return chat_pb2.JoinResponse(message=f"Welcome, {name}!")
+        return chat_pb2.JoinResponse(welcome_message=f"Welcome, {name}!")
 
     #Function to broadcast message to all connected clients
     def SendMessage(self, request, context):
         with self.lock:
             self.messages.append(request) #add to message history list
             for client in self.clients:
-                client.put(request) #push the message to all current client's queues
+                if isinstance(client, Queue):
+                    client.put(request) #push the message to all current client's queues
 
         return chat_pb2.Empty()
 
