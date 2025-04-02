@@ -4,9 +4,10 @@ import chat_pb2_grpc
 import proxy_pb2_grpc
 import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, messagebox
 import hashlib
 import random
+
 def rgb_to_hsl(r, g, b):
     """Convert RGB values (0-255) to HSL (0-1, 0-1, 0-1)"""
     r, g, b = r/255.0, g/255.0, b/255.0
@@ -45,12 +46,14 @@ def hsl_to_rgb(h, s, l):
         b = hue_to_rgb(p, q, h - 1/3)
     
     return int(round(r * 255)), int(round(g * 255)), int(round(b * 255))
+
 class ChatApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Chat Application")
-        self.root.geometry("300x200")
+        self.root.geometry("300x300")
 
+        # Username section
         tk.Label(self.root, text="Enter your name:").pack(pady=5)
         self.entry = tk.Entry(self.root)
         self.entry.pack(pady=5)
@@ -58,8 +61,23 @@ class ChatApp:
         self.generate_button = tk.Button(self.root, text="Generate Name", command=self.generate_name)
         self.generate_button.pack(pady=5)
 
+        # Proxy server section
+        tk.Label(self.root, text="Proxy Server (optional):").pack(pady=5)
+        self.proxy_frame = tk.Frame(self.root)
+        self.proxy_frame.pack(pady=5)
+        
+        self.proxy_entry = tk.Entry(self.proxy_frame, width=20)
+        self.proxy_entry.pack(side=tk.LEFT, padx=2)
+        self.proxy_entry.insert(0, "localhost")
+        
+        tk.Label(self.proxy_frame, text=":").pack(side=tk.LEFT)
+        
+        self.port_entry = tk.Entry(self.proxy_frame, width=6)
+        self.port_entry.pack(side=tk.LEFT, padx=2)
+        self.port_entry.insert(0, "50052")
+
         self.submit_button = tk.Button(self.root, text="Join Chat", command=self.submit_name)
-        self.submit_button.pack(pady=5)
+        self.submit_button.pack(pady=10)
 
         self.root.mainloop()
 
@@ -71,35 +89,79 @@ class ChatApp:
 
     def submit_name(self):
         name = self.entry.get().strip()
-        if name:
+        if not name:
+            messagebox.showerror("Error", "Please enter a name")
+            return
+
+        proxy_address = self.proxy_entry.get().strip()
+        port = self.port_entry.get().strip()
+        
+        # Validate port
+        try:
+            port = int(port)
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Invalid Port", "Please enter a valid port number (1-65535)")
+            return
+            
+        # If proxy address is empty, use localhost
+        if not proxy_address:
+            proxy_address = "localhost"
+            
+        server_address = f"{proxy_address}:{port}"
+        
+        # Test connection before proceeding
+        try:
+            channel = grpc.insecure_channel(server_address)
+            grpc.channel_ready_future(channel).result(timeout=5)  # 5 second timeout
             self.root.destroy()
-            ChatClientGUI(name)
+            ChatClientGUI(name, server_address)
+        except grpc.FutureTimeoutError:
+            messagebox.showerror("Connection Failed", 
+                               f"Could not connect to server at {server_address}\n"
+                               "Please check the address and try again.")
+        except Exception as e:
+            messagebox.showerror("Connection Error", 
+                               f"An error occurred while connecting:\n{str(e)}")
 
 class ChatClientGUI:
-    def __init__(self, name):
+    def __init__(self, name, proxy_address):
         self.name = name
-        self.channel = grpc.insecure_channel('localhost:50052')  # TODO: Don't hardcode proxy address
-        self.stub = proxy_pb2_grpc.ProxyServiceStub(self.channel)
+        try:
+            self.channel = grpc.insecure_channel(proxy_address)
+            grpc.channel_ready_future(self.channel).result(timeout=5)  # Verify connection
+            self.stub = proxy_pb2_grpc.ProxyServiceStub(self.channel)
+            
+            self.root = tk.Tk()
+            self.root.title(f"Chat - {self.name}")
+            self.root.geometry("400x500")
 
-        self.root = tk.Tk()
-        self.root.title(f"Chat - {self.name}")
-        self.root.geometry("400x500")
+            self.text_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, state=tk.DISABLED)
+            self.text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        self.text_area = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, state=tk.DISABLED)
-        self.text_area.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+            self.entry = tk.Entry(self.root)
+            self.entry.pack(padx=10, pady=5, fill=tk.X)
+            self.entry.bind("<Return>", self.send_message)
 
-        self.entry = tk.Entry(self.root)
-        self.entry.pack(padx=10, pady=5, fill=tk.X)
-        self.entry.bind("<Return>", self.send_message)
+            self.send_button = tk.Button(self.root, text="Send", command=self.send_message)
+            self.send_button.pack(pady=5)
 
-        self.send_button = tk.Button(self.root, text="Send", command=self.send_message)
-        self.send_button.pack(pady=5)
+            self.join_chat()
+            threading.Thread(target=self.receive_messages, daemon=True).start()
 
-        self.join_chat()
-        threading.Thread(target=self.receive_messages, daemon=True).start()
-
-        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.root.mainloop()
+            self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+            self.root.mainloop()
+            
+        except grpc.FutureTimeoutError:
+            messagebox.showerror("Connection Failed", 
+                               f"Lost connection to server at {proxy_address}")
+            self.root.destroy() if hasattr(self, 'root') else None
+            ChatApp()  # Return to login screen
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {str(e)}")
+            self.root.destroy() if hasattr(self, 'root') else None
+            ChatApp()  # Return to login screen
 
     def join_chat(self):
         response = self.stub.Join(chat_pb2.JoinRequest(name=self.name))
@@ -108,12 +170,22 @@ class ChatClientGUI:
     def send_message(self, event=None):
         msg = self.entry.get().strip()
         if msg:
-            self.stub.SendMessage(chat_pb2.Message(sender=self.name, content=msg))
-            self.entry.delete(0, tk.END)
+            try:
+                self.stub.SendMessage(chat_pb2.Message(sender=self.name, content=msg))
+                self.entry.delete(0, tk.END)
+            except grpc.RpcError as e:
+                messagebox.showerror("Send Error", f"Failed to send message: {e.details()}")
+                self.root.destroy()
+                ChatApp()  # Return to login screen
 
     def receive_messages(self):
-        for message in self.stub.ReceiveMessages(chat_pb2.Empty()):
-            self.append_message(message.sender, message.content)
+        try:
+            for message in self.stub.ReceiveMessages(chat_pb2.Empty()):
+                self.append_message(message.sender, message.content)
+        except grpc.RpcError as e:
+            messagebox.showerror("Connection Error", f"Lost connection to server: {e.details()}")
+            self.root.destroy()
+            ChatApp()  # Return to login screen
 
     def append_message(self, sender, content):
         color = self.get_username_color(sender)
@@ -123,7 +195,6 @@ class ChatClientGUI:
         self.text_area.tag_config(color, foreground=color)
         self.text_area.config(state=tk.DISABLED)
         self.text_area.yview(tk.END)
-
 
     def get_username_color(self, username, dark_mode=False):
         """
@@ -158,8 +229,6 @@ class ChatClientGUI:
         
         # Convert back to hex
         return "#{:02x}{:02x}{:02x}".format(r, g, b)
-
-
 
     def on_close(self):
         self.root.quit()
